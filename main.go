@@ -9,7 +9,9 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/gorilla/websocket"
 )
@@ -19,6 +21,11 @@ type messageStruct struct {
 	Disconnection bool
 	Nickname      string
 	Message       string
+}
+
+type ConnectionResponse struct {
+	IsAllowed bool
+	Message   string
 }
 
 func parseFlags() (string, string, error) {
@@ -38,6 +45,24 @@ func parseFlags() (string, string, error) {
 	}
 
 	return nickname, host + ":" + port, nil
+}
+
+func gentleDisconnect(messageDialer *websocket.Conn, nickname string) {
+	connMessage := &messageStruct{Connection: false, Disconnection: true, Nickname: nickname, Message: "disconnecting"}
+	connJson, error := json.Marshal(connMessage)
+	if error != nil {
+		fmt.Println("Error while marshalling", error)
+	}
+	err := messageDialer.WriteMessage(websocket.TextMessage, []byte(string(connJson)))
+	if err != nil {
+		log.Println("Error on closing client:", err)
+	}
+
+	err = messageDialer.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "Closing client"))
+	if err != nil {
+		log.Println("Error on closing client:", err)
+	}
+	os.Exit(0)
 }
 
 func handleSession(serverAddress string, nickname string) {
@@ -64,13 +89,36 @@ func handleSession(serverAddress string, nickname string) {
 		return
 	}
 
-	_, connectionResponse, err := messageDialer.ReadMessage()
+	_, resp, err := messageDialer.ReadMessage()
 	if err != nil {
 		log.Println("Error on reading:", err)
 		return
 	}
 
-	log.Printf("Connection reponse: %s", connectionResponse)
+	var connectionResponse ConnectionResponse
+	json.Unmarshal(resp, &connectionResponse)
+
+	fmt.Printf("%s\n", connectionResponse.Message)
+
+	if !connectionResponse.IsAllowed {
+		err = messageDialer.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "Closing client"))
+		if err != nil {
+			log.Println("Error on closing client:", err)
+			return
+		}
+		return
+	}
+
+	// CATCHING ^C
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		for sig := range c {
+			if sig == syscall.SIGINT {
+				gentleDisconnect(messageDialer, nickname)
+			}
+		}
+	}()
 
 	// READING INCOMING MESSAGES FROM MESSAGE DIALER
 	go func() {
@@ -80,7 +128,7 @@ func handleSession(serverAddress string, nickname string) {
 				log.Println("Read error:", err)
 				return
 			}
-			log.Printf("Received: %s", message)
+			fmt.Printf("%s\n", message)
 		}
 	}()
 
@@ -126,8 +174,6 @@ func main() {
 		fmt.Println("Error:", err)
 		return
 	}
-	fmt.Println("your nickname is:", nickname)
-	fmt.Println("server address:", serverAddress)
 
 	handleSession(serverAddress, nickname)
 }
