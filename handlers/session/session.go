@@ -40,7 +40,6 @@ func readFromdialer(messageDialer *websocket.Conn) {
 
 func HandleSession(serverAddress string, nickname string) {
 	messageUrl := url.URL{Scheme: "ws", Host: serverAddress, Path: "/run/session"}
-	interrupt := make(chan os.Signal, 1)
 
 	messageDialer, _, err := websocket.DefaultDialer.Dial(messageUrl.String(), nil)
 	if err != nil {
@@ -64,25 +63,15 @@ func HandleSession(serverAddress string, nickname string) {
 		}
 	}()
 
-	for {
-		select {
-		case msg := <-stdio:
-			payload := &message.MessageStruct{Connection: false, Disconnection: false, Nickname: nickname, Message: strings.Trim(msg, "\n")}
-			marshaledPayload, err := json.Marshal(payload)
-			if err != nil {
-				fmt.Println("Error marshalling", err)
-			}
-			err = messageDialer.WriteMessage(websocket.TextMessage, []byte(string(marshaledPayload)))
-			if err != nil {
-				log.Println("Error writing message.", err)
-				return
-			}
-
-		case <-interrupt:
-			err = messageDialer.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "Closing client"))
-			if err != nil {
-				log.Println("Error on closing client:", err)
-			}
+	for msg := range stdio {
+		payload := &message.MessageStruct{Connection: false, Disconnection: false, Nickname: nickname, Message: strings.Trim(msg, "\n")}
+		marshaledPayload, err := json.Marshal(payload)
+		if err != nil {
+			fmt.Println("Error marshalling", err)
+		}
+		err = messageDialer.WriteMessage(websocket.TextMessage, []byte(string(marshaledPayload)))
+		if err != nil {
+			log.Println("Error writing message.", err)
 			return
 		}
 	}
