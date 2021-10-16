@@ -19,11 +19,11 @@ type ConnectionResponse struct {
 func Connect(messageDialer *websocket.Conn, nickname string) {
 	// CONNECTING
 	connMessage := &message.MessageStruct{Connection: true, Disconnection: false, Nickname: nickname, Message: "connecting !"}
-	connJson, error := json.Marshal(connMessage)
-	if error != nil {
-		log.Println("Error while marshalling:", error)
+	connJson, err := json.Marshal(connMessage)
+	if err != nil {
+		log.Println("Error while marshalling:", err)
 	}
-	err := messageDialer.WriteMessage(websocket.TextMessage, []byte(string(connJson)))
+	err = messageDialer.WriteMessage(websocket.TextMessage, []byte(string(connJson)))
 	if err != nil {
 		log.Println("Error writing message:", err)
 		return
@@ -52,11 +52,11 @@ func Connect(messageDialer *websocket.Conn, nickname string) {
 
 func Disconnect(messageDialer *websocket.Conn, nickname string) {
 	connMessage := &message.MessageStruct{Connection: false, Disconnection: true, Nickname: nickname, Message: "disconnecting"}
-	connJson, error := json.Marshal(connMessage)
-	if error != nil {
-		log.Println("Error while marshalling:", error)
+	connJson, err := json.Marshal(connMessage)
+	if err != nil {
+		log.Println("Error while marshalling:", err)
 	}
-	err := messageDialer.WriteMessage(websocket.TextMessage, []byte(string(connJson)))
+	err = messageDialer.WriteMessage(websocket.TextMessage, []byte(string(connJson)))
 	if err != nil {
 		log.Println("Error on closing client:", err)
 	}

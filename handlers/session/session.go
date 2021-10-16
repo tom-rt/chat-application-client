@@ -68,9 +68,9 @@ func HandleSession(serverAddress string, nickname string) {
 		select {
 		case msg := <-stdio:
 			payload := &message.MessageStruct{Connection: false, Disconnection: false, Nickname: nickname, Message: strings.Trim(msg, "\n")}
-			marshaledPayload, error := json.Marshal(payload)
-			if error != nil {
-				fmt.Println("error marshalling", error)
+			marshaledPayload, err := json.Marshal(payload)
+			if err != nil {
+				fmt.Println("Error marshalling", err)
 			}
 			err = messageDialer.WriteMessage(websocket.TextMessage, []byte(string(marshaledPayload)))
 			if err != nil {
