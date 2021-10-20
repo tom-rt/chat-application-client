@@ -43,11 +43,15 @@ func HandleSession(serverAddress string, nickname string) {
 
 	messageDialer, _, err := websocket.DefaultDialer.Dial(messageUrl.String(), nil)
 	if err != nil {
-		log.Println("Error dialing:", err)
+		log.Fatal("Error dialing:", err)
 	}
 	defer messageDialer.Close()
 
-	connection.Connect(messageDialer, nickname)
+	err = connection.Connect(messageDialer, nickname)
+
+	if err != nil {
+		log.Fatal("Cannot connect to server: ", err)
+	}
 
 	go catchCtrlC(messageDialer, nickname)
 
